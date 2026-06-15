@@ -86,11 +86,57 @@ def test_wrong_width(app, status, warning, file_regression):
 
 @pytest.mark.sphinx(testroot="video-warnings")
 def test_wrong_preload(app, status, warning, file_regression):
-    """Build a video with badly designed option and check it's ignored."""
+    """Build a video with an invalid preload value and check it falls back to auto."""
+    app.env.reread_always.add("wrong_preload")
     app.builder.build_specific([app.srcdir / "wrong_preload.rst"])
+
+    assert 'The provided preload ("toto") is not an accepted value' in warning.getvalue()
 
     # test the video is still existing
     html = (app.outdir / "wrong_preload.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_no_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings")
+def test_empty_preload(app, status, warning, file_regression):
+    """Build a video with an empty preload value and check it falls back to auto."""
+    app.env.reread_always.add("empty_preload")
+    app.builder.build_specific([app.srcdir / "empty_preload.rst"])
+
+    assert "The provided preload is empty or contains only whitespace" in warning.getvalue()
+
+    html = (app.outdir / "empty_preload.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_no_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings")
+def test_whitespace_preload(app, status, warning, file_regression):
+    """Build a video with a whitespace-padded valid preload value."""
+    app.env.reread_always.add("whitespace_preload")
+    app.builder.build_specific([app.srcdir / "whitespace_preload.rst"])
+
+    # No preload warning should be emitted for a valid value padded with whitespace
+    assert "preload" not in warning.getvalue()
+
+    html = (app.outdir / "whitespace_preload.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_preload_metadata", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings")
+def test_invalid_preload(app, status, warning, file_regression):
+    """Build a video with a clearly invalid preload value and check it falls back to auto."""
+    app.env.reread_always.add("invalid_preload")
+    app.builder.build_specific([app.srcdir / "invalid_preload.rst"])
+
+    assert 'The provided preload ("badvalue") is not an accepted value' in warning.getvalue()
+
+    html = (app.outdir / "invalid_preload.html").read_text(encoding="utf8")
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_no_options", extension=".html")
