@@ -42,6 +42,33 @@ SUPPORTED_OPTIONS: List[str] = [
 "List of the supported options attributes"
 
 
+def _process_asset(src: str, env: BuildEnvironment) -> Tuple[str, bool]:
+    """Register a local asset (video or poster) with Sphinx's asset pipeline.
+
+    If the asset is remote (has a netloc, or is a protocol-relative URL), it is
+    returned unchanged and not registered. Otherwise the path is resolved against
+    the current document, recorded as a build dependency and added to
+    ``env.images`` so the builder will copy it to the output directory.
+
+    Args:
+        src: The asset reference (local path or URL)
+        env: the build environment
+
+    Returns:
+        The (possibly resolved) src and whether the asset is remote.
+    """
+    parsed = urllib.parse.urlparse(src)
+    is_remote = bool(parsed.netloc) or src.startswith("//")
+    if not is_remote:
+        # Map asset paths to unique names (so that they can be put into a single
+        # directory). This copies what is done for images by the process_docs
+        # method of sphinx.environment.collectors.asset.ImageCollector.
+        src, fullpath = env.relfn2path(src, env.docname)
+        env.note_dependency(fullpath)
+        env.images.add_file(env.docname, src)
+    return src, is_remote
+
+
 def get_video(src: str, env: BuildEnvironment) -> Tuple[str, str, bool]:
     """Return video and suffix.
 
@@ -61,14 +88,7 @@ def get_video(src: str, env: BuildEnvironment) -> Tuple[str, str, bool]:
         )
     type = SUPPORTED_MIME_TYPES.get(suffix, "")
 
-    is_remote = bool(urllib.parse.urlparse(src).netloc)
-    if not is_remote:
-        # Map video paths to unique names (so that they can be put into a single
-        # directory). This copies what is done for images by the process_docs method of
-        # sphinx.environment.collectors.asset.ImageCollector.
-        src, fullpath = env.relfn2path(src, env.docname)
-        env.note_dependency(fullpath)
-        env.images.add_file(env.docname, src)
+    src, is_remote = _process_asset(src, env)
 
     return (src, type, is_remote)
 
@@ -177,6 +197,14 @@ class Video(SphinxDirective):
                 f'A secondary source should be provided for "{self.arguments[0]}"'
             )
 
+        # Process poster through the same asset pipeline as local video sources
+        # so it gets copied to the build output and its path is rewritten.
+        poster_raw: str = self.options.get("poster", "")
+        if poster_raw:
+            poster_src, poster_is_remote = _process_asset(poster_raw, env)
+        else:
+            poster_src, poster_is_remote = "", True
+
         return [
             video_node(
                 sources=sources,
@@ -187,7 +215,8 @@ class Video(SphinxDirective):
                 height=height,
                 loop="loop" in self.options,
                 muted="muted" in self.options,
-                poster=self.options.get("poster", ""),
+                poster=poster_src,
+                poster_is_remote=poster_is_remote,
                 preload=preload,
                 width=width,
                 klass=self.options.get("class", ""),
@@ -239,6 +268,9 @@ class VideoPostTransform(SphinxPostTransform):
             for src, _, is_remote in node["sources"]:
                 if not is_remote:
                     self.app.builder.images[src] = self.env.images[src][1]
+            poster = node.get("poster", "")
+            if poster and not node.get("poster_is_remote", True):
+                self.app.builder.images[poster] = self.env.images[poster][1]
 
 
 def visit_video_node_html(translator: HTMLTranslator, node: video_node) -> None:
@@ -257,13 +289,27 @@ def visit_video_node_html(translator: HTMLTranslator, node: video_node) -> None:
     else:
         html += ">"
     # start the video block
-    attr: List[str] = [f'{k}="{node[k]}"' for k in SUPPORTED_OPTIONS if node[k]]
+    builder = translator.builder
+    # Render poster separately so local posters can be rewritten through the
+    # builder's image pipeline (like local video sources). Remote posters and
+    # empty posters are emitted as-is / omitted.
+    attr: List[str] = [
+        f'{k}="{node[k]}"'
+        for k in SUPPORTED_OPTIONS
+        if k != "poster" and node[k]
+    ]
+    poster = node.get("poster", "")
+    if poster:
+        if not node.get("poster_is_remote", True) and poster in builder.images:
+            poster = Path(
+                builder.imgpath, urllib.parse.quote(builder.images[poster])
+            ).as_posix()
+        attr += [f'poster="{poster}"']
     if node["klass"]:  # klass need to be special cased
         attr += [f"class=\"{node['klass']}\""]
     html += f"<video {' '.join(attr)}>"
 
     # build the sources
-    builder = translator.builder
     html_source = '<source src="{}" type="{}">'
     for src, type_, _ in node["sources"]:
         # Rewrite the URI if the environment knows about it, as is done for images in the

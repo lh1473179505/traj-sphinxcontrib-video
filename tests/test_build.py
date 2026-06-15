@@ -122,3 +122,71 @@ def test_video_force_secondary(app, status, warning, file_regression):
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_secondary", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_video_local_poster(app, status, warning, file_regression):
+    """A local poster must be copied to the build output and rewritten to _images/."""
+    app.builder.build_specific([app.srcdir / "mp4_local_poster.rst"])
+
+    # The poster file must have been copied into the builder's image output dir.
+    assert (app.outdir / "_images" / "poster.png").exists(), (
+        "Local poster was not copied to the build output directory"
+    )
+    # The local video source must still be copied too.
+    assert (app.outdir / "_images" / "video.mp4").exists(), (
+        "Local video source was not copied to the build output directory"
+    )
+
+    html = (app.outdir / "mp4_local_poster.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0]
+
+    # The poster attribute must point at the builder's rewritten path, not the
+    # source-relative path "videos/poster.png".
+    assert video.get("poster") == "_images/poster.png", (
+        f"Local poster was not rewritten to builder imgpath, got {video.get('poster')!r}"
+    )
+    # The local video source must still be rewritten correctly.
+    sources = video.select("source")
+    assert len(sources) == 1
+    assert sources[0].get("src") == "_images/video.mp4", (
+        f"Local video source was not rewritten correctly, got {sources[0].get('src')!r}"
+    )
+
+    file_regression.check(
+        video.prettify(formatter=fmt),
+        basename="video_local_poster",
+        extension=".html",
+    )
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_video_remote_poster(app, status, warning, file_regression):
+    """A remote poster (http/https) must be emitted unchanged and not copied."""
+    app.builder.build_specific([app.srcdir / "mp4_remote_poster.rst"])
+
+    html = (app.outdir / "mp4_remote_poster.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0]
+
+    # Remote poster must pass through verbatim.
+    assert video.get("poster") == "https://example.com/remote-poster.png", (
+        f"Remote poster was unexpectedly modified, got {video.get('poster')!r}"
+    )
+    # The local video source must still be rewritten correctly.
+    sources = video.select("source")
+    assert len(sources) == 1
+    assert sources[0].get("src") == "_images/video.mp4"
+
+    # The remote poster image must NOT have been copied into the output tree.
+    copied_files = [p.name for p in (app.outdir / "_images").glob("*")]
+    assert "remote-poster.png" not in copied_files, (
+        "Remote poster was unexpectedly copied to the build output directory"
+    )
+
+    file_regression.check(
+        video.prettify(formatter=fmt),
+        basename="video_remote_poster",
+        extension=".html",
+    )
