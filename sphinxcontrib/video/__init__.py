@@ -135,13 +135,23 @@ class Video(SphinxDirective):
                 )
                 height = ""
 
-        preload: str = self.options.get("preload", "auto")
         valid_preload = ["auto", "metadata", "none"]
-        if preload not in valid_preload:
-            logger.warning(
-                f'The provided preload ("{preload}") is not an accepted value. defaulting to "auto"'
-            )
+        if "preload" not in self.options:
             preload = "auto"
+        else:
+            preload = self.options["preload"]
+            if preload is None or str(preload).strip() == "":
+                logger.warning(
+                    'The preload option value is empty. defaulting to "auto"'
+                )
+                preload = "auto"
+            else:
+                preload = str(preload).strip()
+                if preload not in valid_preload:
+                    logger.warning(
+                        f'The provided preload ("{preload}") is not an accepted value. defaulting to "auto"'
+                    )
+                    preload = "auto"
 
         controlslist: str = self.options.get("controlslist", "")
         if controlslist:

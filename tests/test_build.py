@@ -84,16 +84,48 @@ def test_wrong_width(app, status, warning, file_regression):
     file_regression.check(video, basename="video_no_options", extension=".html")
 
 
-@pytest.mark.sphinx(testroot="video-warnings")
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
 def test_wrong_preload(app, status, warning, file_regression):
     """Build a video with badly designed option and check it's ignored."""
     app.builder.build_specific([app.srcdir / "wrong_preload.rst"])
+
+    assert (
+        'The provided preload ("toto") is not an accepted value. defaulting to "auto"'
+        in warning.getvalue()
+    )
 
     # test the video is still existing
     html = (app.outdir / "wrong_preload.html").read_text(encoding="utf8")
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_no_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
+def test_empty_preload(app, status, warning, file_regression):
+    """Build a video with empty preload and check it warns and defaults to auto."""
+    app.builder.build_specific([app.srcdir / "empty_preload.rst"])
+
+    assert (
+        'The preload option value is empty. defaulting to "auto"'
+        in warning.getvalue()
+    )
+
+    html = (app.outdir / "empty_preload.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_no_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
+def test_trimmed_preload(app, status, warning, file_regression):
+    """Build a video with whitespace-padded valid preload and check it's trimmed."""
+    app.builder.build_specific([app.srcdir / "trimmed_preload.rst"])
+
+    html = (app.outdir / "trimmed_preload.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_preload_metadata", extension=".html")
 
 
 @pytest.mark.sphinx(testroot="video-warnings")
