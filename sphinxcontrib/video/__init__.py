@@ -1,5 +1,6 @@
 """Video extension to embed video in a html sphinx output."""
 
+import html
 import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -289,7 +290,7 @@ def depart_video_node_html(translator: HTMLTranslator, node: video_node) -> None
         html_caption += (
             '<figcaption class="align-center">'
             '<p style="text-align: left; display:inline-block">'
-            f'<span class="caption-text">{node["caption"]}</span>'
+            f'<span class="caption-text">{html.escape(node["caption"])}</span>'
             "</p></figcaption></figure>"
         )
     else:

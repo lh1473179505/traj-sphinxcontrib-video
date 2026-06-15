@@ -122,3 +122,59 @@ def test_video_force_secondary(app, status, warning, file_regression):
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_secondary", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_video_caption_escape(app, status, warning):
+    """Build a video with HTML-sensitive caption and verify escaping."""
+    app.builder.build_specific([app.srcdir / "mp4_caption_escape.rst"])
+
+    raw_html = (app.outdir / "mp4_caption_escape.html").read_text(encoding="utf8")
+
+    # Extract the figcaption section to scope assertions
+    soup = BeautifulSoup(raw_html, "html.parser")
+    figcaption = soup.select("figcaption")
+    assert len(figcaption) == 1
+    figcaption_html = str(figcaption[0])
+
+    # Raw script tags must not appear in the figcaption
+    assert "<script>" not in figcaption_html
+    assert "</script>" not in figcaption_html
+
+    # The escaped forms must be present in the raw HTML within the caption area
+    # Find the caption-text span in raw HTML to check escaping
+    caption_span = soup.select("span.caption-text")
+    assert len(caption_span) == 1
+    # BeautifulSoup decodes entities back to text, so verify the decoded text
+    assert "<script>alert(1)</script> A&B" in caption_span[0].get_text()
+
+    # Also verify the raw HTML contains escaped entities near caption-text
+    # Extract the raw span content by regex
+    import re
+
+    span_match = re.search(
+        r'<span class="caption-text">(.*?)</span>', raw_html, re.DOTALL
+    )
+    assert span_match is not None
+    raw_caption = span_match.group(1)
+    assert "&lt;script&gt;" in raw_caption
+    assert "&lt;/script&gt;" in raw_caption
+    assert "&amp;" in raw_caption
+
+    # Structural tags must remain intact (not escaped)
+    assert "<figure" in raw_html
+    assert "<figcaption" in raw_html
+    assert '<span class="caption-text">' in raw_html
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_video_caption_normal(app, status, warning):
+    """Build a video with a normal caption and verify it is readable."""
+    app.builder.build_specific([app.srcdir / "mp4_caption_normal.rst"])
+
+    raw_html = (app.outdir / "mp4_caption_normal.html").read_text(encoding="utf8")
+    soup = BeautifulSoup(raw_html, "html.parser")
+
+    caption_span = soup.select("span.caption-text")
+    assert len(caption_span) == 1
+    assert caption_span[0].get_text().strip() == "A normal caption text"
