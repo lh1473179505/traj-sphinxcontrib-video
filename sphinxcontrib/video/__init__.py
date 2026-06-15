@@ -1,5 +1,6 @@
 """Video extension to embed video in a html sphinx output."""
 
+import html
 import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -243,28 +244,27 @@ class VideoPostTransform(SphinxPostTransform):
 
 def visit_video_node_html(translator: HTMLTranslator, node: video_node) -> None:
     """Entry point of the html video node."""
-    html: str = ""
+    html_out: str = ""
     # has caption?
     if node["caption"]:
-        html += "<figure "
+        html_out += "<figure "
     else:
-        html += "<div "
+        html_out += "<div "
     # align
-    html += f' class="sphinx-contrib-video-container align-{node["align"]}"'
+    html_out += f' class="sphinx-contrib-video-container align-{node["align"]}"'
     # figwidth
     if node["figwidth"]:
-        html += f' style="width: {node["figwidth"]}"><div class="align-center">'
+        html_out += f' style="width: {html.escape(node["figwidth"])}"><div class="align-center">'
     else:
-        html += ">"
+        html_out += ">"
     # start the video block
-    attr: List[str] = [f'{k}="{node[k]}"' for k in SUPPORTED_OPTIONS if node[k]]
+    attr: List[str] = [f'{k}="{html.escape(str(node[k]))}"' for k in SUPPORTED_OPTIONS if node[k]]
     if node["klass"]:  # klass need to be special cased
-        attr += [f"class=\"{node['klass']}\""]
-    html += f"<video {' '.join(attr)}>"
+        attr += [f'class="{html.escape(node["klass"])}"']
+    html_out += f"<video {' '.join(attr)}>"
 
     # build the sources
     builder = translator.builder
-    html_source = '<source src="{}" type="{}">'
     for src, type_, _ in node["sources"]:
         # Rewrite the URI if the environment knows about it, as is done for images in the
         # HTML5 builder, in sphinx.writers.html5.HTML5Translator.visit_image.
@@ -272,12 +272,12 @@ def visit_video_node_html(translator: HTMLTranslator, node: video_node) -> None:
             src = Path(
                 builder.imgpath, urllib.parse.quote(builder.images[src])
             ).as_posix()
-        html += html_source.format(src, type_)
+        html_out += f'<source src="{html.escape(src)}" type="{html.escape(type_)}">'
 
     # add the alternative message
-    html += node["alt"]
+    html_out += html.escape(node["alt"])
 
-    translator.body.append(html)
+    translator.body.append(html_out)
 
 
 def depart_video_node_html(translator: HTMLTranslator, node: video_node) -> None:
@@ -289,7 +289,7 @@ def depart_video_node_html(translator: HTMLTranslator, node: video_node) -> None
         html_caption += (
             '<figcaption class="align-center">'
             '<p style="text-align: left; display:inline-block">'
-            f'<span class="caption-text">{node["caption"]}</span>'
+            f'<span class="caption-text">{html.escape(node["caption"])}</span>'
             "</p></figcaption></figure>"
         )
     else:

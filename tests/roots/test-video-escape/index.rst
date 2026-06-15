@@ -1,0 +1,6 @@
+video
+=====
+
+.. toctree::
+    special
+    normal
