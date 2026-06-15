@@ -1,5 +1,6 @@
 """Video extension to embed video in a html sphinx output."""
 
+import re
 import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -40,6 +41,21 @@ SUPPORTED_OPTIONS: List[str] = [
     "controlslist",
 ]
 "List of the supported options attributes"
+
+# Regex for safe figwidth values: positive integer followed by an allowed CSS unit.
+# Allowed units: px, %, em, rem, pt, pc, in, cm, mm.
+# This rejects semicolons, colons, parentheses, quotes, CSS functions, negative
+# numbers, compound expressions, and unknown units to prevent style injection.
+FIGWIDTH_RE: re.Pattern = re.compile(r"^\d+(px|%|em|rem|pt|pc|in|cm|mm)$")
+
+
+def validate_figwidth(value: str) -> bool:
+    """Check whether *value* is a safe CSS length for use in a style attribute.
+
+    Only positive (or zero) integer values with a known unit are accepted.
+    Leading/trailing whitespace is stripped before matching.
+    """
+    return bool(FIGWIDTH_RE.match(value.strip()))
 
 
 def get_video(src: str, env: BuildEnvironment) -> Tuple[str, str, bool]:
@@ -165,6 +181,14 @@ class Video(SphinxDirective):
         figwidth: str = self.options.get("figwidth", "")
         if not caption:
             figwidth = ""
+        elif figwidth:
+            figwidth = figwidth.strip()
+            if not validate_figwidth(figwidth):
+                logger.warning(
+                    f'The provided figwidth ("{figwidth}") is not a valid CSS length '
+                    "value and is ignored"
+                )
+                figwidth = ""
 
         # add the primary video files as images in the builder
         sources = [get_video(self.arguments[0], env)]

@@ -7,3 +7,4 @@ video
     wrong_width
     wrong_preload
     wrong_controlslist
+    wrong_figwidth
