@@ -122,3 +122,55 @@ def test_video_force_secondary(app, status, warning, file_regression):
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_secondary", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_video_caption(app, status, warning):
+    """Build a video with a normal caption and verify it renders correctly."""
+    app.builder.build_specific([app.srcdir / "mp4_caption.rst"])
+
+    raw_html = (app.outdir / "mp4_caption.html").read_text(encoding="utf8")
+    html = BeautifulSoup(raw_html, "html.parser")
+
+    # caption text should appear inside .caption-text span
+    caption_span = html.select_one(".caption-text")
+    assert caption_span is not None, "Expected a .caption-text span"
+    assert caption_span.string == "My sample video"
+
+    # structural tags should be present
+    assert html.select_one("figure") is not None
+    assert html.select_one("figcaption") is not None
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_video_caption_xss(app, status, warning):
+    """Build a video with HTML-sensitive caption and verify it is escaped."""
+    app.builder.build_specific([app.srcdir / "mp4_caption_xss.rst"])
+
+    raw_html = (app.outdir / "mp4_caption_xss.html").read_text(encoding="utf8")
+    html = BeautifulSoup(raw_html, "html.parser")
+
+    # raw <script> tag must NOT be present in the output
+    assert "<script>alert(1)</script>" not in raw_html, (
+        "Raw <script> tag found in output HTML — caption was not escaped"
+    )
+    figure = html.select_one("figure")
+    assert figure is not None
+    assert figure.select("script") == [], (
+        "A <script> element was parsed inside the figure — caption was not escaped"
+    )
+
+    # the escaped caption text should appear in .caption-text
+    caption_span = html.select_one(".caption-text")
+    assert caption_span is not None, "Expected a .caption-text span"
+    caption_text = caption_span.get_text()
+    assert "<script>alert(1)</script>" in caption_text, (
+        "Escaped script text should be readable as text content"
+    )
+    assert "A&B" in caption_text, (
+        "Ampersand in caption should be preserved as text"
+    )
+
+    # structural tags should still be present
+    assert html.select_one("figure") is not None
+    assert html.select_one("figcaption") is not None
