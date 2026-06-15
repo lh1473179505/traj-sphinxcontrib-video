@@ -60,10 +60,12 @@ def test_wrong_format(app, status, warning, file_regression):
     file_regression.check(video, basename="video_wrong_format", extension=".html")
 
 
-@pytest.mark.sphinx(testroot="video-warnings")
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
 def test_wrong_height(app, status, warning, file_regression):
     """Build a video with badly designed option and check it's ignored."""
     app.builder.build_specific([app.srcdir / "wrong_height.rst"])
+
+    assert 'The provided height ("12em") is ignored' in warning.getvalue()
 
     # test the video is still existing
     html = (app.outdir / "wrong_height.html").read_text(encoding="utf8")
@@ -72,10 +74,12 @@ def test_wrong_height(app, status, warning, file_regression):
     file_regression.check(video, basename="video_no_options", extension=".html")
 
 
-@pytest.mark.sphinx(testroot="video-warnings")
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
 def test_wrong_width(app, status, warning, file_regression):
     """Build a video with badly designed option and check it's ignored."""
     app.builder.build_specific([app.srcdir / "wrong_width.rst"])
+
+    assert 'The provided width ("12em") is ignored' in warning.getvalue()
 
     # test the video is still existing
     html = (app.outdir / "wrong_width.html").read_text(encoding="utf8")
@@ -122,3 +126,55 @@ def test_video_force_secondary(app, status, warning, file_regression):
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_secondary", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_video_px_options(app, status, warning, file_regression):
+    """Build a video with decimal pixel width and height."""
+    app.builder.build_specific([app.srcdir / "mp4_px_options.rst"])
+
+    html = (app.outdir / "mp4_px_options.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_px_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
+def test_wrong_width_abcpx(app, status, warning, file_regression):
+    """Build a video with non-numeric px width and check it's ignored."""
+    app.builder.build_specific([app.srcdir / "wrong_width_abcpx.rst"])
+
+    assert 'The provided width ("abcpx") is ignored' in warning.getvalue()
+
+    html = (app.outdir / "wrong_width_abcpx.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_no_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
+def test_wrong_height_negative(app, status, warning, file_regression):
+    """Build a video with negative px height and check it's ignored."""
+    app.builder.build_specific([app.srcdir / "wrong_height_negative.rst"])
+
+    assert 'The provided height ("-320px") is ignored' in warning.getvalue()
+
+    html = (app.outdir / "wrong_height_negative.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0].prettify(formatter=fmt)
+    file_regression.check(video, basename="video_no_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video-warnings", freshenv=True)
+def test_percent_width_ignores_height(app, status, warning, file_regression):
+    """Build a video with percentage width and check height is ignored."""
+    app.builder.build_specific([app.srcdir / "percent_width_with_height.rst"])
+
+    assert 'The provided height ("320") is ignored' in warning.getvalue()
+    assert "is relative" in warning.getvalue()
+
+    html = (app.outdir / "percent_width_with_height.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0]
+    assert video.get("width") == "50%"
+    assert video.get("height") is None
