@@ -112,15 +112,17 @@ class Video(SphinxDirective):
 
         # check options that need to be specific values
 
-        width: str = self.options.get("width", "")
-        if width and not (width.isdigit() or str_is_percentage(width)):
+        width: str = self.options.get("width", "").strip()
+        if width and not (
+            width.isdigit() or str_is_percentage(width) or str_is_pixel_value(width)
+        ):
             logger.warning(
-                f'The provided width ("{width}") is ignored as it\'s not an integer '
-                "or integer percentage"
+                f'The provided width ("{width}") is ignored as it\'s not an integer, '
+                "a pixel value, or a percentage"
             )
             width = ""
 
-        height: str = self.options.get("height", "")
+        height: str = self.options.get("height", "").strip()
         if height:
             if width.endswith("%"):
                 logger.warning(
@@ -128,10 +130,10 @@ class Video(SphinxDirective):
                     f'width ("{width}") is relative'
                 )
                 height = ""
-            elif not height.isdigit():
+            elif not (height.isdigit() or str_is_pixel_value(height)):
                 logger.warning(
                     f'The provided height ("{height}") is ignored as it\'s not an '
-                    "integer"
+                    "integer or pixel value"
                 )
                 height = ""
 
@@ -211,6 +213,16 @@ def str_is_float(string: str) -> bool:
         return True
     except ValueError:
         return False
+
+
+def str_is_pixel_value(string: str) -> bool:
+    """Check if the string represents a valid non-negative CSS pixel value (e.g. '640px', '640.5px')."""
+    if not string.endswith("px"):
+        return False
+    num_part = string[:-2]
+    if not num_part or "-" in num_part:
+        return False
+    return str_is_float(num_part)
 
 
 class VideoPostTransform(SphinxPostTransform):

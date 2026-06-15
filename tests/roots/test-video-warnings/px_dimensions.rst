@@ -2,4 +2,5 @@ video
 =====
 
 .. video:: _static/video.mp4
-    :height: 12em
+    :width: 640.5px
+    :height: 320.25px
