@@ -25,7 +25,10 @@ def test_video(app, status, warning, file_regression):
 
     html = (app.outdir / "mp4.html").read_text(encoding="utf8")
     html = BeautifulSoup(html, "html.parser")
-    video = html.select("video")[0].prettify(formatter=fmt)
+    video = html.select("video")[0]
+    source = video.select("source")[0]
+    assert source.get("type") == "video/mp4"
+    video = video.prettify(formatter=fmt)
     file_regression.check(video, basename="video_no_options", extension=".html")
 
 
@@ -53,10 +56,14 @@ def test_wrong_format(app, status, warning, file_regression):
         in warning.getvalue()
     )
 
-    # test the video is still existing
+    # test the video is still existing with source but no empty type attribute
     html = (app.outdir / "wrong_format.html").read_text(encoding="utf8")
     html = BeautifulSoup(html, "html.parser")
-    video = html.select("video")[0].prettify(formatter=fmt)
+    video = html.select("video")[0]
+    source = video.select("source")[0]
+    assert source.get("src") == "_images/video.mkv"
+    assert "type" not in source.attrs
+    video = video.prettify(formatter=fmt)
     file_regression.check(video, basename="video_wrong_format", extension=".html")
 
 
