@@ -59,6 +59,26 @@ def test_wrong_format(app, status, warning, file_regression):
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_wrong_format", extension=".html")
 
+    # The source element must still be rendered, but without an empty type attribute.
+    video_tag = BeautifulSoup(video, "html.parser").select("video")[0]
+    source = video_tag.select("source")[0]
+    assert source.has_attr("src")
+    assert not source.has_attr("type"), (
+        f"Unsupported format must not render an empty type attribute, got type={source.get('type')!r}"
+    )
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_supported_format_keeps_type(app, status, warning):
+    """Ensure supported formats still render the type attribute on <source>."""
+    app.builder.build_specific([app.srcdir / "mp4.rst"])
+
+    html = (app.outdir / "mp4.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    source = html.select("source")[0]
+    assert source.has_attr("type"), "Supported format must render the type attribute"
+    assert source["type"] == "video/mp4"
+
 
 @pytest.mark.sphinx(testroot="video-warnings")
 def test_wrong_height(app, status, warning, file_regression):

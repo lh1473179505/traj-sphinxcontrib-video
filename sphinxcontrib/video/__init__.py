@@ -264,7 +264,6 @@ def visit_video_node_html(translator: HTMLTranslator, node: video_node) -> None:
 
     # build the sources
     builder = translator.builder
-    html_source = '<source src="{}" type="{}">'
     for src, type_, _ in node["sources"]:
         # Rewrite the URI if the environment knows about it, as is done for images in the
         # HTML5 builder, in sphinx.writers.html5.HTML5Translator.visit_image.
@@ -272,7 +271,10 @@ def visit_video_node_html(translator: HTMLTranslator, node: video_node) -> None:
             src = Path(
                 builder.imgpath, urllib.parse.quote(builder.images[src])
             ).as_posix()
-        html += html_source.format(src, type_)
+        if type_:
+            html += f'<source src="{src}" type="{type_}">'
+        else:
+            html += f'<source src="{src}">'
 
     # add the alternative message
     html += node["alt"]
