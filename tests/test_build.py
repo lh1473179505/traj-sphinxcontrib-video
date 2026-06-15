@@ -37,9 +37,7 @@ def test_video_options(app, status, warning, file_regression):
     html = (app.outdir / "mp4_options.html").read_text(encoding="utf8")
     print(html)
     html = BeautifulSoup(html, "html.parser")
-    video = html.select("video")[0]
-    video.attrs["controlslist"] = " ".join(sorted(video.attrs["controlslist"].split()))
-    video = video.prettify(formatter=fmt)
+    video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_options", extension=".html")
 
 
@@ -106,6 +104,19 @@ def test_wrong_controlslist(app, status, warning, file_regression):
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_no_options", extension=".html")
+
+
+@pytest.mark.sphinx(testroot="video")
+def test_controlslist_order_preserved(app, status, warning):
+    """Build a video and assert controlslist tokens keep input order and are deduplicated."""
+    app.builder.build_specific([app.srcdir / "mp4_controlslist_order.rst"])
+
+    html = (app.outdir / "mp4_controlslist_order.html").read_text(encoding="utf8")
+    html = BeautifulSoup(html, "html.parser")
+    video = html.select("video")[0]
+    # Input: noremoteplayback, nodownload, nofullscreen, nodownload (duplicate)
+    # Expected: order preserved, duplicate "nodownload" removed (keeps first occurrence)
+    assert video.attrs["controlslist"] == "noremoteplayback nodownload nofullscreen"
 
 
 @pytest.mark.sphinx(testroot="video-secondary")

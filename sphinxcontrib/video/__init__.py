@@ -145,14 +145,21 @@ class Video(SphinxDirective):
 
         controlslist: str = self.options.get("controlslist", "")
         if controlslist:
-            controlslist_set = set(sorted(controlslist.split(",")))
             valid_token = ["nodownload", "nofullscreen", "noremoteplayback"]
-            if not controlslist_set.issubset(valid_token):
+            # Strip whitespace, preserve input order, deduplicate (first occurrence wins)
+            seen = set()
+            tokens = []
+            for token in controlslist.split(","):
+                token = token.strip()
+                if token and token not in seen:
+                    seen.add(token)
+                    tokens.append(token)
+            if not seen.issubset(valid_token):
                 logger.warning(
                     f"The controlslist can only contains value from: {valid_token}"
                 )
-                controlslist_set = set()
-            controlslist = " ".join(controlslist_set)
+                tokens = []
+            controlslist = " ".join(tokens)
 
         align: str = self.options.get("align", "left")
         if align not in ["left", "center", "right", "default"]:
