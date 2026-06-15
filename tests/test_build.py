@@ -122,3 +122,74 @@ def test_video_force_secondary(app, status, warning, file_regression):
     html = BeautifulSoup(html, "html.parser")
     video = html.select("video")[0].prettify(formatter=fmt)
     file_regression.check(video, basename="video_secondary", extension=".html")
+
+
+# ---------------------------------------------------------------------------
+# Focused unit tests for get_video() remote-vs-local detection
+# ---------------------------------------------------------------------------
+from unittest.mock import MagicMock, call
+from sphinxcontrib.video import get_video
+
+
+def _make_fake_env():
+    """Return a lightweight fake BuildEnvironment for get_video()."""
+    env = MagicMock()
+    env.docname = "index"
+    # relfn2path returns (relative_src, absolute_fullpath)
+    env.relfn2path = MagicMock(side_effect=lambda src, docname: (src, "/fake/" + src))
+    return env
+
+
+class TestGetVideoLocal:
+    """Local paths must trigger relfn2path / note_dependency / images.add_file."""
+
+    def test_relative_path(self):
+        env = _make_fake_env()
+        src, mime, is_remote = get_video("_static/video.mp4", env)
+
+        assert is_remote is False
+        assert mime == "video/mp4"
+        env.relfn2path.assert_called_once_with("_static/video.mp4", "index")
+        env.note_dependency.assert_called_once_with("/fake/_static/video.mp4")
+        env.images.add_file.assert_called_once_with("index", "_static/video.mp4")
+
+    def test_unc_backslash_path(self):
+        env = _make_fake_env()
+        src, mime, is_remote = get_video("\\\\server\\share\\clip.mp4", env)
+
+        assert is_remote is False
+        env.relfn2path.assert_called_once()
+        env.note_dependency.assert_called_once()
+        env.images.add_file.assert_called_once()
+
+
+class TestGetVideoRemote:
+    """Remote URLs must NOT touch relfn2path / note_dependency / images.add_file."""
+
+    def test_https_url(self):
+        env = _make_fake_env()
+        src, mime, is_remote = get_video("https://example.com/clip.mp4", env)
+
+        assert is_remote is True
+        assert mime == "video/mp4"
+        env.relfn2path.assert_not_called()
+        env.note_dependency.assert_not_called()
+        env.images.add_file.assert_not_called()
+
+    def test_http_url(self):
+        env = _make_fake_env()
+        src, mime, is_remote = get_video("http://example.com/clip.mp4", env)
+
+        assert is_remote is True
+        env.relfn2path.assert_not_called()
+        env.note_dependency.assert_not_called()
+        env.images.add_file.assert_not_called()
+
+    def test_protocol_relative_url(self):
+        env = _make_fake_env()
+        src, mime, is_remote = get_video("//cdn.example.com/clip.mp4", env)
+
+        assert is_remote is True
+        env.relfn2path.assert_not_called()
+        env.note_dependency.assert_not_called()
+        env.images.add_file.assert_not_called()

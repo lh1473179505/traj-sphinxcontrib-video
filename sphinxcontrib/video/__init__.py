@@ -61,7 +61,10 @@ def get_video(src: str, env: BuildEnvironment) -> Tuple[str, str, bool]:
         )
     type = SUPPORTED_MIME_TYPES.get(suffix, "")
 
-    is_remote = bool(urllib.parse.urlparse(src).netloc)
+    parsed = urllib.parse.urlparse(src)
+    is_remote = parsed.scheme in ("http", "https") or (
+        bool(parsed.netloc) and src.startswith("//")
+    )
     if not is_remote:
         # Map video paths to unique names (so that they can be put into a single
         # directory). This copies what is done for images by the process_docs method of
