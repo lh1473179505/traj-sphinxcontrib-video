@@ -61,7 +61,10 @@ def get_video(src: str, env: BuildEnvironment) -> Tuple[str, str, bool]:
         )
     type = SUPPORTED_MIME_TYPES.get(suffix, "")
 
-    is_remote = bool(urllib.parse.urlparse(src).netloc)
+    # Check for Windows UNC paths (\\server\share\...) which are local
+    is_unc = src.startswith("\\\\")
+    # urlparse treats UNC paths as having a netloc, but they are local files
+    is_remote = not is_unc and bool(urllib.parse.urlparse(src).netloc)
     if not is_remote:
         # Map video paths to unique names (so that they can be put into a single
         # directory). This copies what is done for images by the process_docs method of
